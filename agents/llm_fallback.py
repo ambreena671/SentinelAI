@@ -99,7 +99,7 @@ class ResilientLLMClient:
                     ],
 
                     # Current commonly available Groq model.
-                    model="llama-3.1-8b-instant",
+                    model="openai/gpt-oss-20b",
 
                     temperature=0.2,
 
