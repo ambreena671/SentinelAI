@@ -141,7 +141,8 @@ scan_clicked = st.button(
 )
 
 
-def build_prompt(findings, guidance, source_name, scan_type):
+def build_prompt(findings, guidance, source_name, scan_type, source_code=""):
+    code_section = source_code[:30000] if source_code else "(Source excerpt unavailable; reason from scanner findings only.)"
     return f"""
 You are SentinelAI, a senior defensive application-security analyst.
 
@@ -174,6 +175,13 @@ Findings:
 
 OWASP/CWE guidance:
 {json.dumps(guidance, indent=2)}
+
+Source code excerpt for independent review:
+```text
+{code_section}
+```
+
+Even when the static finding list is empty, perform an independent security review of the source excerpt. Look for missing validation, authorization, authentication, CSRF protection, unsafe output handling, secrets, insecure cryptography, unsafe file access, SSRF, injection, insecure deserialization, and security misconfiguration when the code context supports such a conclusion. Do not invent a vulnerability when the evidence is insufficient.
 """
 
 
@@ -183,6 +191,9 @@ def severity_count(findings, level):
 
 def analyze_files(file_items, scan_type, source_name):
     all_findings = []
+    source_for_ai = "\n\n".join(
+        f"### {name}\n{text[:12000]}" for name, text in file_items[:5]
+    )
     progress = st.progress(0, text="Starting source analysis...")
     total = len(file_items)
     for index, (relative_name, text) in enumerate(file_items, start=1):
@@ -194,7 +205,7 @@ def analyze_files(file_items, scan_type, source_name):
     rag = LightweightRAGTool()
     guidance = rag.retrieve_guidance(json.dumps(all_findings), top_k=8)
     llm = ResilientLLMClient()
-    summary = llm.generate(build_prompt(all_findings, guidance, source_name, scan_type))
+    summary = llm.generate(build_prompt(all_findings, guidance, source_name, scan_type, source_for_ai))
 
     return {
         "product": "SentinelAI",
@@ -260,7 +271,7 @@ if findings_data:
 
     st.subheader("🔎 Security Findings")
     if not findings:
-        st.success("No issues were detected by the configured checks. This does not prove the code is vulnerability-free.")
+        st.info("No findings were triggered by the local static rules. This does not prove the code is vulnerability-free; the AI assessment above also reviews the source excerpt for additional security weaknesses.")
 
     for index, finding in enumerate(findings, start=1):
         severity = str(finding.get("severity", "INFO")).upper()
