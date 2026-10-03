@@ -22,12 +22,15 @@ class ResilientLLMClient:
     1. Groq
     2. Gemini
 
-    The source code is sent to the AI for defensive
-    security analysis. The AI must not invent findings.
+    Groq:
+        openai/gpt-oss-20b
+
+    Gemini:
+        gemini-2.5-flash
     """
 
     GROQ_MODEL = "openai/gpt-oss-20b"
-    GEMINI_MODEL = "gemini-3.8-flash"
+    GEMINI_MODEL = "gemini-2.5-flash"
 
     def __init__(self):
         self.groq_key = self._get_secret("GROQ_API_KEY")
@@ -38,9 +41,10 @@ class ResilientLLMClient:
         self.groq_error = None
         self.gemini_error = None
 
-        # -----------------------------------------
-        # Initialize Groq
-        # -----------------------------------------
+        # =================================================
+        # GROQ INITIALIZATION
+        # =================================================
+
         if self.groq_key and Groq:
 
             try:
@@ -53,21 +57,22 @@ class ResilientLLMClient:
                     f"Groq initialization error: {exc}"
                 )
 
-        elif self.groq_key and Groq is None:
-
-            self.groq_error = (
-                "Groq API package is not installed."
-            )
-
         elif not self.groq_key:
 
             self.groq_error = (
                 "GROQ_API_KEY is not configured."
             )
 
-        # -----------------------------------------
-        # Initialize Gemini
-        # -----------------------------------------
+        elif Groq is None:
+
+            self.groq_error = (
+                "Groq API package is not installed."
+            )
+
+        # =================================================
+        # GEMINI INITIALIZATION
+        # =================================================
+
         if self.gemini_key and genai:
 
             try:
@@ -80,16 +85,16 @@ class ResilientLLMClient:
                     f"Gemini initialization error: {exc}"
                 )
 
-        elif self.gemini_key and genai is None:
-
-            self.gemini_error = (
-                "Gemini API package is not installed."
-            )
-
         elif not self.gemini_key:
 
             self.gemini_error = (
                 "GEMINI_API_KEY is not configured."
+            )
+
+        elif genai is None:
+
+            self.gemini_error = (
+                "Gemini API package is not installed."
             )
 
     # =====================================================
@@ -111,7 +116,7 @@ class ResilientLLMClient:
         except Exception:
             pass
 
-        # Environment variables
+        # Environment variable fallback
         value = os.getenv(key_name)
 
         if value:
@@ -129,6 +134,7 @@ class ResilientLLMClient:
             return None
 
         try:
+
             choices = getattr(
                 response,
                 "choices",
@@ -158,7 +164,7 @@ class ResilientLLMClient:
             if content:
                 return str(content).strip()
 
-            # Some SDK versions expose model_dump()
+            # Compatibility with different SDK versions
             if hasattr(message, "model_dump"):
 
                 data = message.model_dump()
@@ -190,12 +196,15 @@ class ResilientLLMClient:
     ) -> str:
 
         if not self.groq_client:
+
             raise RuntimeError(
                 "Groq client is not initialized."
             )
 
         response = self.groq_client.chat.completions.create(
+
             model=self.GROQ_MODEL,
+
             messages=[
                 {
                     "role": "system",
@@ -206,46 +215,81 @@ class ResilientLLMClient:
                     "content": prompt,
                 },
             ],
+
+            # GPT-OSS reasoning configuration.
+            # Low reasoning leaves more room for the
+            # actual security report.
+            reasoning_effort="low",
+
+            # We only need the final security report,
+            # not the model's internal reasoning.
+            include_reasoning=False,
+
             temperature=0.2,
-            max_completion_tokens=4096,
+
+            # Increased from 4096 because your previous
+            # request ended with finish_reason="length".
+            max_completion_tokens=8192,
+
+            stream=False,
+
             timeout=timeout,
         )
 
-        text = self._extract_groq_text(response)
+        if response is None:
 
-        if text:
-            return text
+            raise RuntimeError(
+                "Groq returned no response."
+            )
 
-        # Try to determine why there was no content
-        try:
+        choices = getattr(
+            response,
+            "choices",
+            None
+        )
 
-            if hasattr(response, "model_dump"):
+        if not choices:
 
-                data = response.model_dump()
+            raise RuntimeError(
+                "Groq returned no choices."
+            )
 
-                choices = data.get(
-                    "choices",
-                    []
-                )
+        choice = choices[0]
 
-                if choices:
+        message = getattr(
+            choice,
+            "message",
+            None
+        )
 
-                    finish_reason = choices[0].get(
-                        "finish_reason"
-                    )
+        if message is None:
 
-                    if finish_reason:
+            raise RuntimeError(
+                "Groq returned no message."
+            )
 
-                        raise RuntimeError(
-                            "Groq returned no text. "
-                            f"Finish reason: {finish_reason}"
-                        )
+        content = getattr(
+            message,
+            "content",
+            None
+        )
 
-        except RuntimeError:
-            raise
+        if content:
 
-        except Exception:
-            pass
+            return str(content).strip()
+
+        finish_reason = getattr(
+            choice,
+            "finish_reason",
+            None
+        )
+
+        if finish_reason:
+
+            raise RuntimeError(
+                "Groq returned no text. "
+                f"Finish reason: {finish_reason}"
+            )
 
         raise RuntimeError(
             "Groq returned an empty response."
@@ -262,11 +306,13 @@ class ResilientLLMClient:
     ) -> str:
 
         if not self.gemini_key:
+
             raise RuntimeError(
                 "GEMINI_API_KEY is not configured."
             )
 
         if genai is None:
+
             raise RuntimeError(
                 "Gemini API package is not installed."
             )
@@ -276,10 +322,13 @@ class ResilientLLMClient:
         )
 
         response = model.generate_content(
+
             f"{system_prompt}\n\n"
             f"Task:\n{prompt}",
+
             generation_config={
                 "temperature": 0.2,
+                "max_output_tokens": 8192,
             },
         )
 
@@ -290,6 +339,7 @@ class ResilientLLMClient:
         )
 
         if text:
+
             return text.strip()
 
         raise RuntimeError(
@@ -315,14 +365,18 @@ class ResilientLLMClient:
             "2. Only report issues supported by the "
             "actual source code.\n"
             "3. Explain the exact code evidence.\n"
-            "4. Explain why the code is risky.\n"
-            "5. Map vulnerabilities to OWASP/CWE when "
+            "4. Identify the affected file and line when "
+            "available.\n"
+            "5. Explain why the code is risky.\n"
+            "6. Map vulnerabilities to OWASP/CWE when "
             "appropriate.\n"
-            "6. Explain potential security impact.\n"
-            "7. Describe the attack type at a high level.\n"
-            "8. Provide practical remediation.\n"
-            "9. Do not provide exploit payloads.\n"
-            "10. Do not provide instructions for attacking "
+            "7. Explain potential security impact.\n"
+            "8. Describe the attack type at a high level.\n"
+            "9. Provide practical remediation.\n"
+            "10. If the code does not support a finding, "
+            "do not report it.\n"
+            "11. Do not provide exploit payloads.\n"
+            "12. Do not provide instructions for attacking "
             "real systems.\n"
         ),
         timeout: int = 45,
@@ -356,6 +410,7 @@ class ResilientLLMClient:
         else:
 
             if self.groq_error:
+
                 errors.append(
                     self.groq_error
                 )
@@ -385,6 +440,7 @@ class ResilientLLMClient:
         else:
 
             if self.gemini_error:
+
                 errors.append(
                     self.gemini_error
                 )
@@ -394,6 +450,7 @@ class ResilientLLMClient:
         # =================================================
 
         if not errors:
+
             errors.append(
                 "No AI provider is configured."
             )
