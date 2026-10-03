@@ -1,0 +1,65 @@
+{
+  "scan_type": "Single Source File Security Audit",
+  "file_name": "demo_search.py",
+  "findings": [
+    {
+      "source": "CyberSage static heuristics",
+      "issue": "Possible SQL Injection",
+      "category": "Injection",
+      "file_path": "demo_search.py",
+      "line_start": 12,
+      "line_end": 12,
+      "severity": "CRITICAL",
+      "confidence": "Potential - review context",
+      "cwe": "CWE-89",
+      "owasp": "A03:2021 - Injection",
+      "attack_type": "SQL injection",
+      "risk": "User-controlled data may alter database query structure and could expose or modify database records.",
+      "evidence": "query = \"SELECT * FROM users WHERE name = '\" + user_input + \"'\"",
+      "remediation": "Use a parameterized query or safe ORM API; never concatenate untrusted input into SQL."
+    },
+    {
+      "source": "CyberSage static heuristics",
+      "issue": "Possible Hardcoded Secret",
+      "category": "Secrets",
+      "file_path": "demo_search.py",
+      "line_start": 5,
+      "line_end": 5,
+      "severity": "HIGH",
+      "confidence": "Potential - review context",
+      "cwe": "CWE-798",
+      "owasp": "A07:2021 - Identification and Authentication Failures",
+      "attack_type": "Credential exposure / account or service abuse",
+      "risk": "An exposed credential could be reused if the source is obtained.",
+      "evidence": "API_KEY = \"demo********key\"",
+      "remediation": "Move the secret to environment variables or a managed secret store and rotate it."
+    }
+  ],
+  "rag_guidance": [
+    {
+      "id": "A03:2021 / CWE-89",
+      "name": "SQL Injection",
+      "description": "Untrusted input can alter the structure of a database query when it is concatenated into SQL.",
+      "attack_type": "SQL injection",
+      "impact": "May expose, change, or delete database data depending on application privileges.",
+      "remediation": "Use parameterized queries or a safe ORM API. Validate inputs and use least-privilege database accounts."
+    },
+    {
+      "id": "A03:2021 / CWE-79",
+      "name": "Cross-Site Scripting",
+      "description": "Untrusted data reaches an HTML or script-sensitive output context without appropriate encoding or sanitization.",
+      "attack_type": "Cross-site scripting (XSS)",
+      "impact": "May allow attacker-controlled browser content in another user's session, depending on the sink and context.",
+      "remediation": "Prefer safe text rendering and context-aware output encoding. Sanitize HTML only when HTML is actually required."
+    },
+    {
+      "id": "A07:2021 / CWE-798",
+      "name": "Hardcoded Credentials",
+      "description": "Secrets embedded in source code can be exposed through repositories, logs, builds, or source distribution.",
+      "attack_type": "Credential exposure",
+      "impact": "Could enable unauthorized use of the associated service or account if the credential remains valid.",
+      "remediation": "Use environment variables or a secret manager and rotate exposed credentials."
+    }
+  ],
+  "executive_summary": "The demo contains a critical SQL-injection risk and a high-risk hardcoded secret. These are static-analysis findings: they indicate dangerous code patterns, but exploitability depends on how input reaches the code and what privileges the application has."
+}

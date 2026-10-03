@@ -1,0 +1,5 @@
+streamlit>=1.40.0
+groq>=0.13.0
+google-generativeai>=0.8.5
+semgrep>=1.90.0
+requests>=2.31.0
