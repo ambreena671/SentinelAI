@@ -353,39 +353,54 @@ def build_prompt(findings, guidance, source_name, scan_type, source_code=""):
         else "(Source excerpt unavailable; reason from scanner findings only.)"
     )
 
-    return f"""
-You are SentinelAI, a senior defensive application-security analyst.
+    findings_text = json.dumps(findings, indent=2)
+    guidance_text = json.dumps(guidance, indent=2)
 
-Analyze static-analysis findings from {scan_type}.
+    prompt_parts = [
+        "You are SentinelAI, a senior defensive application-security analyst.",
+        "",
+        f"Analyze static-analysis findings from {scan_type}.",
+        "",
+        "For each important finding explain:",
+        "1. Vulnerability name",
+        "2. Severity",
+        "3. CWE / OWASP mapping if available",
+        "4. File and line",
+        "5. Scanner evidence",
+        "6. What security weakness exists",
+        "7. What kind of attack or abuse could be possible",
+        "8. Potential confidentiality, integrity, or availability impact",
+        "9. A short, non-operational attack path in plain English",
+        "10. How the developer should fix it",
+        "11. A small safer-code example when reasonable",
+        "",
+        "Important:",
+        '- A static finding is not proof of exploitability. Use "could enable" or "may allow" when appropriate.',
+        "- Do not provide attack payloads, commands, exploit chains, or step-by-step procedures against real systems.",
+        "- Never reveal a complete credential or token. Redact secrets.",
+        "- Distinguish scanner evidence from your reasoning.",
+        "- If context is insufficient, explicitly say that manual review is required.",
+        "",
+        f"Source: {source_name}",
+        "",
+        "Findings:",
+        findings_text,
+        "",
+        "OWASP/CWE guidance:",
+        guidance_text,
+        "",
+        "Source code excerpt for independent review:",
+        "```text",
+        code_section,
+        "```",
+        "",
+        "Even when the static finding list is empty, perform an independent "
+        "security review of the source excerpt. Look for missing validation, "
+        "authorization, authentication, CSRF protection, unsafe output handling, "
+        "secrets, insecure cryptography, unsafe file access, SSRF, injection, "
+        "insecure deserialization, and security misconfiguration when the code "
+        "context supports such a conclusion. Do not invent a vulnerability when "
+        "the evidence is insufficient.",
+    ]
 
-For each important finding explain:
-1. Vulnerability name
-2. Severity
-3. CWE / OWASP mapping if available
-4. File and line
-5. Scanner evidence
-6. What security weakness exists
-7. What kind of attack or abuse could be possible
-8. Potential confidentiality, integrity, or availability impact
-9. A short, non-operational attack path in plain English
-10. How the developer should fix it
-11. A small safer-code example when reasonable
-
-Important:
-- A static finding is not proof of exploitability. Use "could enable" or "may allow" when appropriate.
-- Do not provide attack payloads, commands, exploit chains, or step-by-step procedures against real systems.
-- Never reveal a complete credential or token. Redact secrets.
-- Distinguish scanner evidence from your reasoning.
-- If context is insufficient, explicitly say that manual review is required.
-
-Source: {source_name}
-
-Findings:
-{json.dumps(findings, indent=2)}
-
-OWASP/CWE guidance:
-{json.dumps(guidance, indent=2)}
-
-Source code excerpt for independent review:
-```text
-{code_section}
+    return "\n".join(prompt_parts)
