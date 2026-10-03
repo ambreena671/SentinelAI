@@ -346,52 +346,46 @@ scan_clicked = st.button(
 # AI PROMPT
 # ============================================================
 
-def build_prompt(
-    findings,
-    guidance,
-    source_name,
-    scan_type,
-    source_code="",
-):
-
-    # Keep prompt within a reasonable size.
-    code_section = source_code[:24000]
-
-    findings_section = json.dumps(
-        findings,
-        indent=2,
-    )[:12000]
-
-    guidance_section = json.dumps(
-        guidance,
-        indent=2,
-    )[:8000]
-
-    if not code_section:
-        code_section = (
-            "(Source excerpt unavailable. "
-            "Use scanner findings only.)"
-        )
+def build_prompt(findings, guidance, source_name, scan_type, source_code=""):
+    code_section = (
+        source_code[:30000]
+        if source_code
+        else "(Source excerpt unavailable; reason from scanner findings only.)"
+    )
 
     return f"""
-You are SentinelAI, a senior defensive
-application-security analyst.
+You are SentinelAI, a senior defensive application-security analyst.
 
-Perform an independent security review of the
-provided source code.
+Analyze static-analysis findings from {scan_type}.
 
-SOURCE:
-{source_name}
+For each important finding explain:
+1. Vulnerability name
+2. Severity
+3. CWE / OWASP mapping if available
+4. File and line
+5. Scanner evidence
+6. What security weakness exists
+7. What kind of attack or abuse could be possible
+8. Potential confidentiality, integrity, or availability impact
+9. A short, non-operational attack path in plain English
+10. How the developer should fix it
+11. A small safer-code example when reasonable
 
-SCAN TYPE:
-{scan_type}
+Important:
+- A static finding is not proof of exploitability. Use "could enable" or "may allow" when appropriate.
+- Do not provide attack payloads, commands, exploit chains, or step-by-step procedures against real systems.
+- Never reveal a complete credential or token. Redact secrets.
+- Distinguish scanner evidence from your reasoning.
+- If context is insufficient, explicitly say that manual review is required.
 
-STATIC SCANNER FINDINGS:
-{findings_section}
+Source: {source_name}
 
-OWASP/CWE GUIDANCE:
-{guidance_section}
+Findings:
+{json.dumps(findings, indent=2)}
 
-SOURCE CODE:
+OWASP/CWE guidance:
+{json.dumps(guidance, indent=2)}
+
+Source code excerpt for independent review:
 ```text
 {code_section}
