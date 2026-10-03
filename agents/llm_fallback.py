@@ -99,7 +99,7 @@ class ResilientLLMClient:
                     ],
 
                     # Current commonly available Groq model.
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
 
                     temperature=0.2,
 
@@ -137,7 +137,7 @@ class ResilientLLMClient:
 
             try:
                 model = genai.GenerativeModel(
-                    "gemini-2.0-flash"
+                    "gemini-3.8-flash"
                 )
 
                 response = model.generate_content(
